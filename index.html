@@ -1,0 +1,2417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visor y Simulador Aeroespacial 3D — Prototipo RC / Planeador Propulsado (Escala 1:1 cm)</title>
+  <style>
+    :root {
+      --bg-dark: #070b12;
+      --panel-bg: rgba(11, 18, 30, 0.82);
+      --panel-border: rgba(56, 189, 248, 0.24);
+      --accent-cyan: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      font-family: var(--font-sans);
+      color: var(--text-main);
+    }
+
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #label-container {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      overflow: hidden;
+    }
+
+    /* Top Telemetry Header */
+    .hud-header {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      right: 376px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 18px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+      pointer-events: auto;
+    }
+
+    .brand-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(56, 189, 248, 0.25));
+      border: 1px solid var(--accent-cyan);
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .brand-title h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #ffffff;
+    }
+
+    .brand-title p {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .telemetry-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .telemetry-pill {
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      padding: 5px 10px;
+      display: flex;
+      flex-direction: column;
+      min-width: 98px;
+    }
+
+    .telemetry-pill span.lbl {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .telemetry-pill span.val {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--accent-cyan);
+      margin-top: 1px;
+    }
+
+    /* Right HUD Control Panel */
+    .hud-sidebar {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      bottom: 14px;
+      width: 350px;
+      z-index: 10;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      pointer-events: auto;
+    }
+
+    .sidebar-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(15, 23, 42, 0.55);
+    }
+
+    .sidebar-header h2 {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 8px var(--accent-emerald);
+    }
+
+    .sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+    .sidebar-scroll::-webkit-scrollbar-thumb {
+      background: rgba(56, 189, 248, 0.3);
+      border-radius: 4px;
+    }
+
+    .hud-section {
+      background: rgba(15, 23, 42, 0.58);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 10px;
+      padding: 11px 12px;
+    }
+
+    .section-title {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-muted);
+      margin-bottom: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Mode Switcher */
+    .mode-switch-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .hud-btn {
+      appearance: none;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      background: rgba(30, 41, 59, 0.7);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .hud-btn:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(56, 189, 248, 0.14);
+    }
+
+    .hud-btn.active {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.32), rgba(56, 189, 248, 0.28));
+      border-color: var(--accent-cyan);
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+    }
+
+    .hud-btn.active-cad {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(30, 64, 175, 0.45));
+      border-color: #60a5fa;
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(96, 165, 250, 0.3);
+    }
+
+    .hud-btn.full-width {
+      width: 100%;
+      margin-top: 7px;
+      justify-content: space-between;
+      padding: 8px 11px;
+    }
+
+    .badge-state {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(15, 23, 42, 0.75);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    /* Toggle rows */
+    .toggle-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 7px;
+      border-radius: 6px;
+      background: rgba(2, 6, 23, 0.38);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .toggle-row:hover {
+      border-color: rgba(148, 163, 184, 0.25);
+    }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      color: #e2e8f0;
+    }
+
+    .dot-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .toggle-meta {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-muted);
+      margin-right: 6px;
+    }
+
+    .switch-input {
+      accent-color: var(--accent-cyan);
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+    }
+
+    /* Sliders */
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .slider-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .slider-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+
+    .slider-top span.val {
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      background: rgba(148, 163, 184, 0.22);
+      border-radius: 4px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      border: 2px solid #ffffff;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+    }
+
+    .camera-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    /* 3D Floating CSS2D Labels */
+    .label-3d {
+      pointer-events: none;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.3;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(7, 11, 18, 0.86);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      color: #f8fafc;
+      white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+      transform: translate(-50%, -115%);
+    }
+
+    .label-3d.le { border-left: 3px solid #cbd5e1; }
+    .label-3d.ca { border-left: 3px solid #3b82f6; color: #93c5fd; }
+    .label-3d.cg { border-left: 3px solid #ef4444; color: #fca5a5; }
+    .label-3d.pn { border-left: 3px solid #10b981; color: #6ee7b7; }
+    .label-3d.comp { border-left: 3px solid #f59e0b; color: #fcd34d; }
+    .label-3d.dim {
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.55);
+      color: #38bdf8;
+      font-weight: 700;
+      transform: translate(-50%, -50%);
+    }
+    .label-3d.ruler-tick {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      color: #94a3b8;
+      font-size: 10px;
+      padding: 0;
+      transform: translate(-50%, 6px);
+    }
+
+    /* Bottom Legend Bar */
+    .hud-footer {
+      position: absolute;
+      bottom: 14px;
+      left: 16px;
+      z-index: 10;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      pointer-events: auto;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+
+    @media (max-width: 960px) {
+      .hud-header {
+        right: 16px;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .hud-sidebar {
+        top: auto;
+        height: 52vh;
+        width: calc(100% - 28px);
+      }
+      .hud-footer {
+        display: none;
+      }
+    }
+  </style>
+
+  <!-- Import Map for Three.js r160 via HTTPS CDN (100% file:// compatible) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+  <div id="label-container"></div>
+
+  <!-- Top Telemetry Bar -->
+  <header class="hud-header">
+    <div class="brand-block">
+      <div class="brand-badge">CAD · ESCALA 1:1 CM</div>
+      <div class="brand-title">
+        <h1>PROTOTIPO RC / REDBULL TE DA ALAS</h1>
+        <p>Gemelo Digital Aeroespacial · Perfil Clark Y · Margen Estático +10,7 %</p>
+      </div>
+    </div>
+    <div class="telemetry-pills">
+      <div class="telemetry-pill">
+        <span class="lbl">Envergadura (X)</span>
+        <span class="val">89,497 cm</span>
+      </div>
+      <div class="telemetry-pill">
+        <span class="lbl">Long. / Diag.</span>
+        <span class="val">63,495 / 64,070 cm</span>
+      </div>
+      <div class="telemetry-pill">
+        <span class="lbl">Cuerda Alar</span>
+        <span class="val">12,13 cm (Clark Y)</span>
+      </div>
+      <div class="telemetry-pill">
+        <span class="lbl">CG Diseño (40%)</span>
+        <span class="val">26,40 cm nariz</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Right Control Sidebar -->
+  <aside class="hud-sidebar">
+    <div class="sidebar-header">
+      <h2><span class="status-dot"></span> PANEL DE CONTROL DE INGENIERÍA</h2>
+      <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">1 u = 1 cm</span>
+    </div>
+
+    <div class="sidebar-scroll">
+      <!-- 1. Visual Mode & Empennage Position -->
+      <section class="hud-section">
+        <div class="section-title">
+          <span>1. Apariencia y Configuración CAD vs Real</span>
+        </div>
+        <div class="mode-switch-grid">
+          <button id="btn-mode-real" class="hud-btn active" type="button">
+            <span>🟢</span> Avión Real Físico
+          </button>
+          <button id="btn-mode-cad" class="hud-btn" type="button">
+            <span>🔷</span> Vista CAD Onshape
+          </button>
+        </div>
+
+        <button id="btn-toggle-htail" class="hud-btn full-width" type="button">
+          <span>Estabilizador Horizontal:</span>
+          <span id="htail-badge" class="badge-state">REAL (53–62 cm)</span>
+        </button>
+
+        <button id="btn-toggle-xray" class="hud-btn full-width" type="button">
+          <span>Modo Rayos X (Internos + Costillas)</span>
+          <span id="xray-badge" class="badge-state">OFF</span>
+        </button>
+      </section>
+
+      <!-- 2. Aerodynamic & Stability Markers -->
+      <section class="hud-section">
+        <div class="section-title">
+          <span>2. Puntos Aerodinámicos y Estabilidad</span>
+          <button id="btn-toggle-all-aero" style="background:none;border:none;color:var(--accent-cyan);font-size:10px;cursor:pointer;font-family:var(--font-mono);">TODOS</button>
+        </div>
+        <div class="toggle-list">
+          <label class="toggle-row">
+            <span class="toggle-label">
+              <span class="dot-indicator" style="background:#cbd5e1;"></span>
+              Borde de Ataque (BA)
+            </span>
+            <div>
+              <span class="toggle-meta">21,55 cm</span>
+              <input type="checkbox" id="chk-le" class="switch-input" checked />
+            </div>
+          </label>
+
+          <label class="toggle-row">
+            <span class="toggle-label">
+              <span class="dot-indicator" style="background:#3b82f6;"></span>
+              Centro Aerodinámico (CA 25%)
+            </span>
+            <div>
+              <span class="toggle-meta">24,55 cm</span>
+              <input type="checkbox" id="chk-ca" class="switch-input" checked />
+            </div>
+          </label>
+
+          <label class="toggle-row">
+            <span class="toggle-label">
+              <span class="dot-indicator" style="background:linear-gradient(90deg,#ef4444 50%,#ffffff 50%);"></span>
+              Centro de Gravedad (CG 40%)
+            </span>
+            <div>
+              <span class="toggle-meta">26,40 cm</span>
+              <input type="checkbox" id="chk-cg" class="switch-input" checked />
+            </div>
+          </label>
+
+          <label class="toggle-row">
+            <span class="toggle-label">
+              <span class="dot-indicator" style="background:#10b981; transform:rotate(45deg); border-radius:2px;"></span>
+              Punto Neutro (PN · ME 10,7%)
+            </span>
+            <div>
+              <span class="toggle-meta">27,70 cm</span>
+              <input type="checkbox" id="chk-pn" class="switch-input" checked />
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <!-- 3. Dimensions & 3D Graduated Ruler -->
+      <section class="hud-section">
+        <div class="section-title">
+          <span>3. Cotas CAD y Regla Graduada 3D</span>
+        </div>
+        <div class="toggle-list">
+          <label class="toggle-row">
+            <span class="toggle-label">📏 Regla Graduada (0 a 63,5 cm)</span>
+            <input type="checkbox" id="chk-ruler" class="switch-input" checked />
+          </label>
+          <label class="toggle-row">
+            <span class="toggle-label">📐 Cotas de Ingeniería (Enverg./Motores)</span>
+            <input type="checkbox" id="chk-dims" class="switch-input" checked />
+          </label>
+          <label class="toggle-row">
+            <span class="toggle-label">🏷️ Etiquetas Flotantes 3D</span>
+            <input type="checkbox" id="chk-labels" class="switch-input" checked />
+          </label>
+        </div>
+      </section>
+
+      <!-- 4. Propulsion & Attitude Simulation -->
+      <section class="hud-section">
+        <div class="section-title">
+          <span>4. Propulsión (M1–M4) y Actitud (Pivote en CG)</span>
+          <button id="btn-reset-attitude" style="background:none;border:none;color:var(--accent-amber);font-size:10px;cursor:pointer;font-family:var(--font-mono);">RESETEAR</button>
+        </div>
+        <div class="slider-group">
+          <div class="slider-item">
+            <div class="slider-top">
+              <span>Potencia Motores M1–M4 (Hélices Ø 45 mm)</span>
+              <span id="val-rpm" class="val">65 %</span>
+            </div>
+            <input type="range" id="sld-rpm" min="0" max="100" value="65" />
+          </div>
+
+          <label class="toggle-row" style="margin-bottom:2px;">
+            <span class="toggle-label">💨 Estelas Helicoidales de Flujo de Aire</span>
+            <input type="checkbox" id="chk-airflow" class="switch-input" checked />
+          </label>
+
+          <div class="slider-item">
+            <div class="slider-top">
+              <span>Cabeceo / Pitch (Eje X en CG 26,4 cm)</span>
+              <span id="val-pitch" class="val">0,0°</span>
+            </div>
+            <input type="range" id="sld-pitch" min="-25" max="25" step="0.5" value="0" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-top">
+              <span>Alabeo / Roll (Eje Z Longitudinal)</span>
+              <span id="val-roll" class="val">0,0°</span>
+            </div>
+            <input type="range" id="sld-roll" min="-35" max="35" step="0.5" value="0" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-top">
+              <span>Guiñada / Yaw (Eje Y Vertical)</span>
+              <span id="val-yaw" class="val">0,0°</span>
+            </div>
+            <input type="range" id="sld-yaw" min="-30" max="30" step="0.5" value="0" />
+          </div>
+
+          <label class="toggle-row">
+            <span class="toggle-label">🌊 Demostración Oscilación Estabilidad Estática</span>
+            <input type="checkbox" id="chk-auto-demo" class="switch-input" />
+          </label>
+        </div>
+      </section>
+
+      <!-- 5. Instant Engineering Camera Presets -->
+      <section class="hud-section">
+        <div class="section-title">
+          <span>5. Vistas Rápidas de Ingeniería</span>
+        </div>
+        <div class="camera-grid">
+          <button id="cam-iso" class="hud-btn active" type="button">🧊 Libre 3D / Iso</button>
+          <button id="cam-top" class="hud-btn" type="button">⬇️ Superior (Planta)</button>
+          <button id="cam-side" class="hud-btn" type="button">➡️ Lateral (Perfil)</button>
+          <button id="cam-front" class="hud-btn" type="button">⬆️ Vista Frontal</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <!-- Bottom Material & Reference Legend -->
+  <footer class="hud-footer">
+    <div class="legend-item">
+      <span class="swatch" style="background:#008244;"></span>
+      <span>Forro Verde Esmeralda / Costillas Balsa</span>
+    </div>
+    <div class="legend-item">
+      <span class="swatch" style="background:#b5926b;"></span>
+      <span>Empenaje Cartón Kraft + Cinta (#dcd4b8)</span>
+    </div>
+    <div class="legend-item">
+      <span class="swatch" style="background:#ef4444;"></span>
+      <span>CG 26,4 cm · CA 24,55 cm · PN 27,7 cm</span>
+    </div>
+  </footer>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+    // ============================================================================
+    // 1. EXACT ENGINEERING CONSTANTS (1 Three.js unit = 1.0 cm)
+    // ============================================================================
+    const SPECS = {
+      fuselageLength: 63.495,
+      fuselageMaxDiag: 64.070,
+      wingspan: 89.497,
+      wingspanX: 89.473,
+      wingspanDiag: 89.798,
+      wingLE: 21.55,          // Leading edge from nose (cm)
+      wingChord: 12.13,       // Total chord (cm) -> TE at 33.68 cm
+      wingSplitRatio: 0.35,   // Forward gray section vs rear yellow section in CAD
+      posCA: 24.55,           // 25% MAC Aerodynamic Center
+      posCG: 26.40,           // 40% MAC Design Center of Gravity
+      posPN: 27.70,           // Neutral Point (Static margin 10.7%)
+      fusRadiusAtWing: 3.88,  // Radius of central fuselage barrel at wing root
+      motorInnerDist: 8.20,   // M2 & M3 distance from fuselage side edge
+      motorOuterDist: 24.60,  // M1 & M4 distance from fuselage side edge
+      propDiameter: 4.50,     // 45 mm = 4.5 cm propeller diameter
+      vTailStart: 43.00,
+      vTailEnd: 63.00,
+      vTailHeight: 11.00,
+      hTailRealStart: 53.00,
+      hTailRealEnd: 62.00,
+      hTailCadOffset: 2.70,   // CAD position is ~2.7 cm further aft
+      ballastStart: 0.15,
+      ballastEnd: 1.55,       // Lead ballast 14g (0 to ~1.5 cm)
+      batteryStart: 4.00,
+      batteryEnd: 7.00        // Battery 14g (4 to 7 cm)
+    };
+
+    // Coordinate mapping helper:
+    // Nose tip is at Z_local = 0, Tail is at Z_local = +63.495.
+    // We place aircraftGroup inside aircraftPivot with offset Z = -SPECS.posCG (-26.40 cm)
+    // so that aircraftPivot's origin (0, 0, 0) is EXACTLY at the Center of Gravity (26.4 cm).
+    const zFromNose = (cm) => cm;
+
+    // ============================================================================
+    // 2. SCENE, CAMERAS, RENDERERS & LIGHTING
+    // ============================================================================
+    const container = document.getElementById('canvas-container');
+    const labelContainer = document.getElementById('label-container');
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x070b12);
+    scene.fog = new THREE.FogExp2(0x070b12, 0.0022);
+
+    const perspectiveCamera = new THREE.PerspectiveCamera(
+      40,
+      window.innerWidth / window.innerHeight,
+      0.5,
+      1000
+    );
+    perspectiveCamera.position.set(68, 42, -55);
+
+    const orthoSize = 58;
+    const aspect = window.innerWidth / window.innerHeight;
+    const orthoCamera = new THREE.OrthographicCamera(
+      -orthoSize * aspect,
+      orthoSize * aspect,
+      orthoSize,
+      -orthoSize,
+      -500,
+      1000
+    );
+
+    let activeCamera = perspectiveCamera;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    container.appendChild(renderer.domElement);
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelContainer.appendChild(labelRenderer.domElement);
+
+    const controls = new OrbitControls(activeCamera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(0, 1, 0); // Centered on CG
+
+    // Lighting Studio
+    const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.75);
+    scene.add(ambientLight);
+
+    const hemiLight = new THREE.HemisphereLight(0xf0f9ff, 0x0f172a, 0.85);
+    hemiLight.position.set(0, 80, 0);
+    scene.add(hemiLight);
+
+    const dirLightMain = new THREE.DirectionalLight(0xffffff, 2.1);
+    dirLightMain.position.set(55, 85, -45);
+    dirLightMain.castShadow = true;
+    dirLightMain.shadow.mapSize.width = 1024;
+    dirLightMain.shadow.mapSize.height = 1024;
+    dirLightMain.shadow.camera.near = 10;
+    dirLightMain.shadow.camera.far = 240;
+    const d = 65;
+    dirLightMain.shadow.camera.left = -d;
+    dirLightMain.shadow.camera.right = d;
+    dirLightMain.shadow.camera.top = d;
+    dirLightMain.shadow.camera.bottom = -d;
+    dirLightMain.shadow.bias = -0.0005;
+    scene.add(dirLightMain);
+
+    const dirLightRim = new THREE.DirectionalLight(0x38bdf8, 0.85);
+    dirLightRim.position.set(-60, 25, 70);
+    scene.add(dirLightRim);
+
+    const underLight = new THREE.DirectionalLight(0x94a3b8, 0.45);
+    underLight.position.set(0, -50, 0);
+    scene.add(underLight);
+
+    // Subtle Hangar Reference Floor Grid (1 grid square = 10 cm, subdivisions = 1 cm)
+    const gridGroup = new THREE.Group();
+    gridGroup.position.y = -14;
+    const mainGrid = new THREE.GridHelper(160, 16, 0x38bdf8, 0x1e293b);
+    mainGrid.material.opacity = 0.45;
+    mainGrid.material.transparent = true;
+    const subGrid = new THREE.GridHelper(160, 160, 0x1e293b, 0x0f172a);
+    subGrid.material.opacity = 0.25;
+    subGrid.material.transparent = true;
+    gridGroup.add(mainGrid, subGrid);
+    scene.add(gridGroup);
+
+    // ============================================================================
+    // 3. PROCEDURAL TEXTURES (NO EXTERNAL FILES -> ZERO CORS ERRORS ON file://)
+    // ============================================================================
+    function createWrinkledFoilNormalMap() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = 'rgb(128, 128, 255)';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Subtle craft paper / heat-shrink film creases & handmade overlaps
+      for (let i = 0; i < 240; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const len = 25 + Math.random() * 95;
+        const angle = (Math.random() - 0.5) * 0.45 + (Math.random() > 0.3 ? 0 : Math.PI * 0.5);
+        ctx.strokeStyle = i % 2 === 0 ? 'rgba(155, 145, 255, 0.22)' : 'rgba(102, 112, 255, 0.22)';
+        ctx.lineWidth = 1 + Math.random() * 2.5;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+        ctx.stroke();
+      }
+
+      // Vertical tape seam strips every 64px to mimic real green covering strips
+      for (let x = 32; x < 512; x += 64) {
+        ctx.strokeStyle = 'rgba(165, 130, 255, 0.35)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + (Math.random() - 0.5) * 6, 512);
+        ctx.stroke();
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(4, 2);
+      return tex;
+    }
+
+    function createGreenCraftColorMap() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+
+      const grad = ctx.createLinearGradient(0, 0, 512, 512);
+      grad.addColorStop(0, '#008f4c');
+      grad.addColorStop(0.5, '#008243');
+      grad.addColorStop(1, '#007a3d');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Overlapping darker green craft tape seams visible in photos 3 & 4
+      for (let i = 0; i < 18; i++) {
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(0, 68, 34, 0.18)' : 'rgba(20, 165, 95, 0.10)';
+        const y = (i / 18) * 512;
+        ctx.fillRect(0, y, 512, 10 + Math.random() * 14);
+      }
+
+      // Subtle artisan crinkle highlights
+      for (let i = 0; i < 300; i++) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+        ctx.lineWidth = 1;
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 18, y + (Math.random() - 0.5) * 14);
+        ctx.stroke();
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(3, 2);
+      return tex;
+    }
+
+    function createVTailMaskingTapeTexture() {
+      // Replicates the exact vertical fin appearance in photos 3 & 4:
+      // Kraft cardboard base (#b5926b) covered with irregular grid/strips of cream/beige masking tape (#dcd4b8)
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+
+      // Base Kraft cardboard (#b5926b)
+      ctx.fillStyle = '#b5926b';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Subtle cardboard fiber grain
+      for (let i = 0; i < 500; i++) {
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(90, 65, 38, 0.08)' : 'rgba(215, 185, 145, 0.08)';
+        ctx.fillRect(Math.random() * 512, Math.random() * 512, 16, 2);
+      }
+
+      // Masking tape patches (#dcd4b8) arranged along the sweep and in horizontal/diagonal strips
+      ctx.fillStyle = '#dcd4b8';
+      ctx.strokeStyle = 'rgba(135, 110, 80, 0.42)';
+      ctx.lineWidth = 2.2;
+
+      // Perimeter masking tape reinforcement
+      const patches = [
+        // Swept leading edge strips
+        { x: 30, y: 390, w: 190, h: 38, a: -0.68 },
+        { x: 110, y: 270, w: 190, h: 38, a: -0.68 },
+        { x: 195, y: 150, w: 185, h: 38, a: -0.68 },
+        // Horizontal / mosaic strips inside the fin (leaving kraft cardboard peeking through)
+        { x: 250, y: 60, w: 220, h: 34, a: 0.02 },
+        { x: 210, y: 120, w: 95, h: 34, a: 0.05 },
+        { x: 330, y: 118, w: 135, h: 34, a: -0.03 },
+        { x: 175, y: 185, w: 110, h: 36, a: 0.04 },
+        { x: 310, y: 185, w: 155, h: 36, a: 0.01 },
+        { x: 135, y: 255, w: 120, h: 36, a: -0.02 },
+        { x: 280, y: 252, w: 185, h: 36, a: 0.03 },
+        { x: 95, y: 325, w: 135, h: 38, a: 0.02 },
+        { x: 255, y: 322, w: 210, h: 38, a: -0.02 },
+        { x: 55, y: 398, w: 165, h: 40, a: 0.01 },
+        { x: 245, y: 395, w: 220, h: 40, a: 0.0 },
+        // Vertical ribs of tape
+        { x: 295, y: 80, w: 34, h: 360, a: 0.08 },
+        { x: 395, y: 70, w: 34, h: 370, a: 0.04 },
+        { x: 455, y: 55, w: 38, h: 410, a: 0.0 }
+      ];
+
+      for (const p of patches) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.a);
+        ctx.fillStyle = 'rgba(220, 212, 184, 0.90)';
+        ctx.fillRect(0, 0, p.w, p.h);
+        ctx.strokeRect(0, 0, p.w, p.h);
+        ctx.restore();
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function createHTailKraftTexture() {
+      // Replicates the horizontal stabilizer from photo 4:
+      // Kraft cardboard center (#b5926b) with darker brown tape/cut border around the perimeter
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#b5926b';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Darker brown perimeter border as seen in photo 4
+      ctx.strokeStyle = '#6e5034';
+      ctx.lineWidth = 44;
+      ctx.strokeRect(22, 22, 468, 468);
+
+      // Subtle cardboard texture
+      for (let i = 0; i < 400; i++) {
+        ctx.fillStyle = 'rgba(80, 55, 30, 0.07)';
+        ctx.fillRect(Math.random() * 512, Math.random() * 512, 18, 2);
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // Global Cached Procedural Textures (Generated EXACTLY ONCE on startup - 512x512 max, zero regeneration)
+    const normalWrinkleTex = createWrinkledFoilNormalMap();
+    const greenCraftTex = createGreenCraftColorMap();
+    const vTailTapeTex = createVTailMaskingTapeTexture();
+    const hTailKraftTex = createHTailKraftTexture();
+
+    // ============================================================================
+    // 4. MATERIALS PALETTE (REAL PHYSICAL MODEL vs CAD ONSHAPE VIEW) - 60 FPS OPTIMIZED
+    // ============================================================================
+    const MATERIALS = {
+      real: {
+        fuselage: new THREE.MeshStandardMaterial({
+          color: 0x008f4c,
+          map: greenCraftTex,
+          normalMap: normalWrinkleTex,
+          normalScale: new THREE.Vector2(0.25, 0.25),
+          roughness: 0.35,
+          metalness: 0.05,
+          transparent: false,
+          opacity: 1.0,
+          depthWrite: true,
+          side: THREE.FrontSide
+        }),
+        wingFront: new THREE.MeshStandardMaterial({
+          color: 0x008f4c,
+          map: greenCraftTex,
+          normalMap: normalWrinkleTex,
+          normalScale: new THREE.Vector2(0.22, 0.22),
+          roughness: 0.35,
+          metalness: 0.05,
+          transparent: true,
+          opacity: 0.82,
+          depthWrite: false,
+          side: THREE.FrontSide
+        }),
+        wingRear: new THREE.MeshStandardMaterial({
+          color: 0x007a3d,
+          map: greenCraftTex,
+          normalMap: normalWrinkleTex,
+          normalScale: new THREE.Vector2(0.22, 0.22),
+          roughness: 0.35,
+          metalness: 0.05,
+          transparent: true,
+          opacity: 0.82,
+          depthWrite: false,
+          side: THREE.FrontSide
+        }),
+        vTail: new THREE.MeshStandardMaterial({
+          map: vTailTapeTex,
+          roughness: 0.78,
+          metalness: 0.02,
+          side: THREE.DoubleSide
+        }),
+        vTailEdge: new THREE.MeshStandardMaterial({
+          color: 0x7c5a38,
+          roughness: 0.9
+        }),
+        hTail: new THREE.MeshStandardMaterial({
+          map: hTailKraftTex,
+          roughness: 0.75,
+          metalness: 0.02,
+          side: THREE.DoubleSide
+        }),
+        nacelle: new THREE.MeshStandardMaterial({
+          color: 0x007a3d,
+          roughness: 0.35,
+          metalness: 0.05
+        })
+      },
+      cad: {
+        fuselage: new THREE.MeshStandardMaterial({
+          color: 0x8ab4d0,
+          roughness: 0.28,
+          metalness: 0.25,
+          side: THREE.FrontSide
+        }),
+        wingFront: new THREE.MeshStandardMaterial({
+          color: 0xd4d6d8,
+          roughness: 0.35,
+          metalness: 0.12,
+          side: THREE.FrontSide
+        }),
+        wingRear: new THREE.MeshStandardMaterial({
+          color: 0xe59819,
+          roughness: 0.35,
+          metalness: 0.10,
+          side: THREE.FrontSide
+        }),
+        vTail: new THREE.MeshStandardMaterial({
+          color: 0x1f3f85,
+          roughness: 0.35,
+          metalness: 0.15,
+          side: THREE.DoubleSide
+        }),
+        vTailEdge: new THREE.MeshStandardMaterial({
+          color: 0x162d61,
+          roughness: 0.4
+        }),
+        hTail: new THREE.MeshStandardMaterial({
+          color: 0x808487,
+          roughness: 0.38,
+          metalness: 0.15,
+          side: THREE.DoubleSide
+        }),
+        nacelle: new THREE.MeshStandardMaterial({
+          color: 0x8ab4d0,
+          roughness: 0.30,
+          metalness: 0.25
+        })
+      },
+      shared: {
+        balsaWood: new THREE.MeshStandardMaterial({
+          color: 0xd6b588,
+          roughness: 0.85,
+          metalness: 0.02
+        }),
+        sparDark: new THREE.MeshStandardMaterial({
+          color: 0x475569,
+          roughness: 0.5,
+          metalness: 0.3
+        }),
+        propBlack: new THREE.MeshStandardMaterial({
+          color: 0x1a1a1a,
+          roughness: 0.55,
+          metalness: 0.15
+        }),
+        metalHub: new THREE.MeshStandardMaterial({
+          color: 0xe2e8f0,
+          roughness: 0.2,
+          metalness: 0.88
+        }),
+        solderWire: new THREE.MeshStandardMaterial({
+          color: 0xcbd5e1,
+          roughness: 0.22,
+          metalness: 0.92
+        }),
+        leadBallast: new THREE.MeshStandardMaterial({
+          color: 0x334155,
+          roughness: 0.5,
+          metalness: 0.75
+        }),
+        batteryOrange: new THREE.MeshStandardMaterial({
+          color: 0xf59e0b,
+          roughness: 0.35,
+          metalness: 0.2
+        }),
+        cadOutline: new THREE.LineBasicMaterial({
+          color: 0x1e293b,
+          transparent: true,
+          opacity: 0.55
+        })
+      }
+    };
+
+    // ============================================================================
+    // 5. AIRCRAFT HIERARCHY & EXACT GEOMETRY BUILDERS
+    // ============================================================================
+    // Root pivot located at CG (0, 0, 0 in world coordinates = 26.4 cm from nose)
+    const aircraftPivot = new THREE.Group();
+    scene.add(aircraftPivot);
+
+    // Local coordinates inside aircraftGroup:
+    // Z = 0 is Nose tip, Z = +63.495 is Tail end
+    // X = -44.7485 (Left Wingtip) to +44.7485 (Right Wingtip)
+    // Y = Vertical axis
+    const aircraftGroup = new THREE.Group();
+    aircraftGroup.position.set(0, 0, -SPECS.posCG);
+    aircraftPivot.add(aircraftGroup);
+
+    // References for mode switching & animation
+    const dynamicMeshes = {
+      fuselage: [],
+      wingFront: [],
+      wingRear: [],
+      vTail: [],
+      vTailEdge: [],
+      hTail: [],
+      nacelles: [],
+      propellers: [],
+      airflowCones: [],
+      realOnlyDetails: [],
+      cadEdges: [],
+      internalComponents: []
+    };
+
+    // ----------------------------------------------------------------------------
+    // 5.1 FUSELAGE: Bottle/Spindle Profile (0 to 63.495 cm, diagonal 64.070 cm)
+    // ----------------------------------------------------------------------------
+    function getFuselageProfile(z) {
+      // Returns { r: radius, yCenter: vertical centerline offset } at distance z (cm) from nose
+      // Captures the bottle/spindle shape and slight upward sweep of the rear lower cone
+      let r = 1.5;
+      if (z <= 1.8) {
+        // Nose nozzle tip (0 to 1.8 cm)
+        const t = z / 1.8;
+        r = 1.25 + 0.33 * Math.pow(t, 0.7);
+      } else if (z <= 12.0) {
+        // Thin cylindrical neck (1.8 to 12 cm)
+        const t = (z - 1.8) / 10.2;
+        r = 1.58 + 0.28 * t;
+      } else if (z <= 20.0) {
+        // Smooth S-curve bottle shoulder expansion (12 to 20 cm)
+        const t = (z - 12.0) / 8.0;
+        const smooth = t * t * (3 - 2 * t);
+        r = 1.86 + (3.88 - 1.86) * smooth;
+      } else if (z <= 36.0) {
+        // Wide central cylindrical barrel under main wing (20 to 36 cm)
+        const t = (z - 20.0) / 16.0;
+        r = 3.88 + Math.sin(t * Math.PI) * 0.10 - t * 0.18;
+      } else {
+        // Progressive tail cone taper (36 to 63.495 cm)
+        const t = (z - 36.0) / (SPECS.fuselageLength - 36.0);
+        r = 3.70 * (1 - t) + 1.58 * t;
+      }
+
+      // Vertical centerline drop/rise so the top spine stays nearly level at the tail
+      // while the belly tapers upward (giving the 64.070 cm max diagonal in CAD image 6)
+      let yCenter = 0;
+      if (z < 12.0) {
+        yCenter = -0.35;
+      } else if (z < 20.0) {
+        const t = (z - 12.0) / 8.0;
+        yCenter = -0.35 * (1 - t);
+      } else if (z > 36.0) {
+        const t = (z - 36.0) / (SPECS.fuselageLength - 36.0);
+        yCenter = 0.95 * t;
+      }
+
+      return { r, yCenter };
+    }
+
+    function buildFuselage() {
+      const lengthSteps = 110;
+      const radialSegs = 48;
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+
+      for (let i = 0; i <= lengthSteps; i++) {
+        const u = i / lengthSteps;
+        const z = u * SPECS.fuselageLength;
+        const { r, yCenter } = getFuselageProfile(z);
+
+        for (let j = 0; j <= radialSegs; j++) {
+          const v = j / radialSegs;
+          const theta = v * Math.PI * 2;
+          const x = Math.cos(theta) * r;
+          // Slightly elliptical cross-section in central body
+          const y = yCenter + Math.sin(theta) * r * 0.96;
+
+          positions.push(x, y, z);
+          uvs.push(u * 3, v);
+        }
+      }
+
+      for (let i = 0; i < lengthSteps; i++) {
+        for (let j = 0; j < radialSegs; j++) {
+          const a = i * (radialSegs + 1) + j;
+          const b = (i + 1) * (radialSegs + 1) + j;
+          const c = (i + 1) * (radialSegs + 1) + (j + 1);
+          const d = i * (radialSegs + 1) + (j + 1);
+          indices.push(a, b, d);
+          indices.push(b, c, d);
+        }
+      }
+
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geom.setIndex(indices);
+      geom.computeVertexNormals();
+
+      const fuselageMesh = new THREE.Mesh(geom, MATERIALS.real.fuselage);
+      fuselageMesh.castShadow = true;
+      fuselageMesh.receiveShadow = true;
+      fuselageMesh.renderOrder = 2;
+      aircraftGroup.add(fuselageMesh);
+      dynamicMeshes.fuselage.push(fuselageMesh);
+
+      // Front and rear fuselage bulkheads/caps
+      const frontCapGeom = new THREE.CircleGeometry(1.25, 32);
+      frontCapGeom.rotateY(Math.PI);
+      const frontCap = new THREE.Mesh(frontCapGeom, MATERIALS.real.fuselage);
+      frontCap.position.set(0, -0.35, 0);
+      frontCap.renderOrder = 2;
+      aircraftGroup.add(frontCap);
+      dynamicMeshes.fuselage.push(frontCap);
+
+      const rearCapGeom = new THREE.CircleGeometry(1.58 * 0.96, 32);
+      const rearCap = new THREE.Mesh(rearCapGeom, MATERIALS.real.fuselage);
+      rearCap.position.set(0, 0.95, SPECS.fuselageLength);
+      rearCap.renderOrder = 2;
+      aircraftGroup.add(rearCap);
+      dynamicMeshes.fuselage.push(rearCap);
+
+      // CAD collar ring at z = 1.8 cm (visible in CAD images 6 & 8)
+      const collarGeom = new THREE.TorusGeometry(1.58, 0.04, 12, 36);
+      const collarMesh = new THREE.Mesh(collarGeom, MATERIALS.shared.cadOutline);
+      collarMesh.position.set(0, -0.35, 1.8);
+      aircraftGroup.add(collarMesh);
+
+      // Physical prototype detail: Coiled silver lead/solder wire wrapped around the extreme nose tip (Photo 3)
+      const coilGroup = new THREE.Group();
+      for (let k = 0; k < 7; k++) {
+        const ringR = 0.85 + (k / 7) * 0.52;
+        const torus = new THREE.Mesh(
+          new THREE.TorusGeometry(ringR, 0.14, 12, 28),
+          MATERIALS.shared.solderWire
+        );
+        torus.castShadow = false;
+        torus.receiveShadow = false;
+        torus.position.set(0, -0.35, -0.25 + k * 0.22);
+        torus.rotation.x = (Math.random() - 0.5) * 0.15;
+        coilGroup.add(torus);
+      }
+      aircraftGroup.add(coilGroup);
+      dynamicMeshes.realOnlyDetails.push(coilGroup);
+    }
+
+    // ----------------------------------------------------------------------------
+    // 5.2 MAIN WING: Clark Y Plano-Convex Profile, 89.497 cm Span, 12.13 cm Chord
+    //     Forward/Rear Longitudinal Split + Rectangular Internal Spar Cavity
+    // ----------------------------------------------------------------------------
+    function getClarkYUpperY(s) {
+      // Normalized chord s in [0, 1], returns thickness ratio (max ~11.7% at s = 0.28)
+      // Classic plano-convex Clark Y approximation
+      const yt = 0.58 * (
+        0.2969 * Math.sqrt(Math.max(0, s)) -
+        0.1260 * s -
+        0.3516 * Math.pow(s, 2) +
+        0.2843 * Math.pow(s, 3) -
+        0.1036 * Math.pow(s, 4)
+      );
+      return yt * SPECS.wingChord; // Max height ~ 1.42 cm
+    }
+
+    function buildClarkYSubSectionShape(sStart, sEnd, includeSparStep = false, subtractCavity = false) {
+      const shape = new THREE.Shape();
+      const chord = SPECS.wingChord;
+      const steps = 32;
+
+      // Start at bottom leading point of this chord segment (z_local = sStart * chord, y = 0)
+      shape.moveTo(sStart * chord, 0);
+
+      // Upper cambered surface from sStart to sEnd
+      for (let i = 0; i <= steps; i++) {
+        const s = sStart + (sEnd - sStart) * (i / steps);
+        let y = getClarkYUpperY(s);
+        // Subtle step ridge near the 35% chord spar division as shown in CAD image 8
+        if (includeSparStep && s > 0.31) {
+          y += 0.12;
+        }
+        shape.lineTo(s * chord, y);
+      }
+
+      // Down to flat bottom surface at sEnd
+      shape.lineTo(sEnd * chord, 0);
+      // Flat bottom back to sStart
+      shape.lineTo(sStart * chord, 0);
+
+      // Rectangular internal spar cavity visible at the wingtips (CAD image 6 & 8)
+      if (subtractCavity) {
+        const hole = new THREE.Path();
+        const cLeft = 2.65;
+        const cRight = 4.15;
+        const cBottom = 0.22;
+        const cTop = 0.78;
+        hole.moveTo(cLeft, cBottom);
+        hole.lineTo(cRight, cBottom);
+        hole.lineTo(cRight, cTop);
+        hole.lineTo(cLeft, cTop);
+        hole.lineTo(cLeft, cBottom);
+        shape.holes.push(hole);
+      }
+
+      return shape;
+    }
+
+    function extrudeAirfoilAlongX(shape, xStart, xEnd) {
+      const spanLength = Math.abs(xEnd - xStart);
+      const extrudeSettings = {
+        steps: 1,
+        depth: spanLength,
+        bevelEnabled: false
+      };
+      const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      // ExtrudeGeometry extrudes along +Z, with shape X along +X and shape Y along +Y.
+      // We want shape X to map to +Z (chordwise from LE) and Extrude Z to map to +X (spanwise).
+      geom.rotateY(Math.PI / 2);
+      // After rotateY(+90°): old X -> -Z, old Z -> +X. Let's flip Z so shape X goes along +Z:
+      geom.scale(1, 1, -1);
+      // Compute normals cleanly after negative scale
+      const pos = geom.attributes.position;
+      const index = geom.index;
+      if (index) {
+        for (let i = 0; i < index.count; i += 3) {
+          const tmp = index.getX(i + 1);
+          index.setX(i + 1, index.getX(i + 2));
+          index.setX(i + 2, tmp);
+        }
+      } else {
+        for (let i = 0; i < pos.count; i += 3) {
+          for (let k = 0; k < 3; k++) {
+            const tmp = pos.array[(i + 1) * 3 + k];
+            pos.array[(i + 1) * 3 + k] = pos.array[(i + 2) * 3 + k];
+            pos.array[(i + 2) * 3 + k] = tmp;
+          }
+        }
+      }
+      geom.translate(Math.min(xStart, xEnd), 0, 0);
+      geom.computeVertexNormals();
+      return geom;
+    }
+
+    function buildMainWing() {
+      const halfSpan = SPECS.wingspan / 2; // 44.7485 cm
+      const rootX = 3.55;                  // Enters slightly into fuselage side wall
+      const wingMountY = 0.25;             // Mid-high wing vertical placement
+      const sSplit = SPECS.wingSplitRatio; // 0.35 (4.245 cm from LE)
+
+      const shapeFront = buildClarkYSubSectionShape(0.0, sSplit, true, true);
+      const shapeRear = buildClarkYSubSectionShape(sSplit, 1.0, false, false);
+
+      // Build Right (+X) and Left (-X) Semi-wings
+      [-1, 1].forEach((side) => {
+        const xInner = side > 0 ? rootX : -halfSpan;
+        const xOuter = side > 0 ? halfSpan : -rootX;
+
+        const geomFront = extrudeAirfoilAlongX(shapeFront, xInner, xOuter);
+        const meshFront = new THREE.Mesh(geomFront, MATERIALS.real.wingFront);
+        meshFront.position.set(0, wingMountY, SPECS.wingLE);
+        meshFront.castShadow = true;
+        meshFront.receiveShadow = true;
+        meshFront.renderOrder = 2;
+        aircraftGroup.add(meshFront);
+        dynamicMeshes.wingFront.push(meshFront);
+
+        const edgesFront = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geomFront, 25),
+          MATERIALS.shared.cadOutline
+        );
+        edgesFront.position.copy(meshFront.position);
+        aircraftGroup.add(edgesFront);
+        dynamicMeshes.cadEdges.push(edgesFront);
+
+        const geomRear = extrudeAirfoilAlongX(shapeRear, xInner, xOuter);
+        const meshRear = new THREE.Mesh(geomRear, MATERIALS.real.wingRear);
+        meshRear.position.set(0, wingMountY, SPECS.wingLE);
+        meshRear.castShadow = true;
+        meshRear.receiveShadow = true;
+        meshRear.renderOrder = 2;
+        aircraftGroup.add(meshRear);
+        dynamicMeshes.wingRear.push(meshRear);
+
+        const edgesRear = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geomRear, 25),
+          MATERIALS.shared.cadOutline
+        );
+        edgesRear.position.copy(meshRear.position);
+        aircraftGroup.add(edgesRear);
+        dynamicMeshes.cadEdges.push(edgesRear);
+      });
+
+      // In the physical green prototype (Photos 3 & 4), the green wing covering wraps over the central fuselage
+      const shapeCenterCover = buildClarkYSubSectionShape(0.0, 1.0, false, false);
+      const geomCenterCover = extrudeAirfoilAlongX(shapeCenterCover, -rootX - 0.1, rootX + 0.1);
+      const meshCenterCover = new THREE.Mesh(geomCenterCover, MATERIALS.real.fuselage);
+      meshCenterCover.position.set(0, wingMountY + 2.65, SPECS.wingLE);
+      meshCenterCover.scale.set(1, 0.7, 1);
+      meshCenterCover.castShadow = true;
+      meshCenterCover.receiveShadow = true;
+      meshCenterCover.renderOrder = 2;
+      aircraftGroup.add(meshCenterCover);
+      dynamicMeshes.realOnlyDetails.push(meshCenterCover);
+      dynamicMeshes.fuselage.push(meshCenterCover);
+
+      // Internal Balsa Ribs & Main Spar (visible through semi-translucent green foil and in X-Ray mode)
+      const internalWingGroup = new THREE.Group();
+      internalWingGroup.position.set(0, wingMountY, SPECS.wingLE);
+      internalWingGroup.renderOrder = 0;
+
+      // Main Rectangular Spar (Larguero principal de extremo a extremo, visible en cavidad de punta de ala)
+      const sparWallGeom = new THREE.BoxGeometry(SPECS.wingspan - 0.2, 0.62, 1.55);
+      const sparHollowInner = new THREE.BoxGeometry(SPECS.wingspan + 0.1, 0.42, 1.25);
+      const sparMesh = new THREE.Mesh(sparWallGeom, MATERIALS.shared.balsaWood);
+      sparMesh.castShadow = false;
+      sparMesh.receiveShadow = false;
+      sparMesh.position.set(0, 0.50, 3.40);
+      const sparCoreMesh = new THREE.Mesh(sparHollowInner, MATERIALS.shared.sparDark);
+      sparCoreMesh.castShadow = false;
+      sparCoreMesh.receiveShadow = false;
+      sparCoreMesh.position.set(0, 0.50, 3.40);
+      internalWingGroup.add(sparMesh, sparCoreMesh);
+
+      // Secondary rear stringer
+      const rearSpar = new THREE.Mesh(
+        new THREE.BoxGeometry(SPECS.wingspan - 0.4, 0.32, 0.45),
+        MATERIALS.shared.balsaWood
+      );
+      rearSpar.castShadow = false;
+      rearSpar.receiveShadow = false;
+      rearSpar.position.set(0, 0.35, 8.6);
+      internalWingGroup.add(rearSpar);
+
+      // 18 Balsa Wood Airfoil Ribs across the wingspan
+      const ribShape = buildClarkYSubSectionShape(0.02, 0.97, false, true);
+      const ribPositionsX = [-44.5, -39, -33.5, -28.5, -23, -17.5, -12.1, -7.5, -4.2, 4.2, 7.5, 12.1, 17.5, 23, 28.5, 33.5, 39, 44.5];
+      ribPositionsX.forEach((rx) => {
+        const ribGeom = extrudeAirfoilAlongX(ribShape, rx - 0.12, rx + 0.12);
+        const ribMesh = new THREE.Mesh(ribGeom, MATERIALS.shared.balsaWood);
+        ribMesh.castShadow = false;
+        ribMesh.receiveShadow = false;
+        internalWingGroup.add(ribMesh);
+      });
+
+      aircraftGroup.add(internalWingGroup);
+      dynamicMeshes.internalComponents.push(internalWingGroup);
+    }
+
+    // ----------------------------------------------------------------------------
+    // 5.3 PROPULSION SYSTEM: 4 Motors (M1 to M4) + Ø 45 mm (4.5 cm) 2-Blade Props
+    // ----------------------------------------------------------------------------
+    const motorSpecs = [
+      { id: 'M1', x: -(SPECS.fusRadiusAtWing + SPECS.motorOuterDist), dir: 1, distLabel: '24,6 cm' },
+      { id: 'M2', x: -(SPECS.fusRadiusAtWing + SPECS.motorInnerDist), dir: -1, distLabel: '8,2 cm' },
+      { id: 'M3', x: +(SPECS.fusRadiusAtWing + SPECS.motorInnerDist), dir: 1, distLabel: '8,2 cm' },
+      { id: 'M4', x: +(SPECS.fusRadiusAtWing + SPECS.motorOuterDist), dir: -1, distLabel: '24,6 cm' }
+    ];
+
+    function buildPropulsionSystem() {
+      const nacelleRadius = 1.02;
+      const nacelleLength = 3.10;
+      const propRadius = SPECS.propDiameter / 2; // 2.25 cm (45 mm diameter)
+      const motorY = 0.82;
+      const nacelleCenterZ = SPECS.wingLE - nacelleLength * 0.42; // Protrudes ahead of wing LE (21.55 cm)
+
+      motorSpecs.forEach((m) => {
+        const motorUnit = new THREE.Group();
+        motorUnit.position.set(m.x, motorY, nacelleCenterZ);
+
+        // Cylindrical motor nacelle (aligned with Z axis)
+        const nacGeom = new THREE.CylinderGeometry(nacelleRadius, nacelleRadius, nacelleLength, 28);
+        nacGeom.rotateX(Math.PI / 2);
+        const nacMesh = new THREE.Mesh(nacGeom, MATERIALS.real.nacelle);
+        nacMesh.castShadow = true;
+        motorUnit.add(nacMesh);
+        dynamicMeshes.nacelles.push(nacMesh);
+
+        const nacEdges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(nacGeom, 30),
+          MATERIALS.shared.cadOutline
+        );
+        motorUnit.add(nacEdges);
+        dynamicMeshes.cadEdges.push(nacEdges);
+
+        // Metallic motor core + shaft protruding forward
+        const shaftGeom = new THREE.CylinderGeometry(0.16, 0.16, 0.9, 16);
+        shaftGeom.rotateX(Math.PI / 2);
+        const shaftMesh = new THREE.Mesh(shaftGeom, MATERIALS.shared.metalHub);
+        shaftMesh.position.z = -nacelleLength / 2 - 0.35;
+        motorUnit.add(shaftMesh);
+
+        // Rotating 2-blade 45 mm Propeller Assembly
+        const propGroup = new THREE.Group();
+        propGroup.position.z = -nacelleLength / 2 - 0.55;
+        propGroup.userData.spinDir = m.dir;
+
+        // Metallic central spinner hub
+        const hubMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.32, 0.38, 0.42, 18).rotateX(Math.PI / 2),
+          MATERIALS.shared.metalHub
+        );
+        propGroup.add(hubMesh);
+
+        // Two aerodynamic blades (total diameter = 4.50 cm)
+        const bladeGeom = new THREE.BoxGeometry(propRadius * 0.96, 0.38, 0.08);
+        const blade1 = new THREE.Mesh(bladeGeom, MATERIALS.shared.propBlack);
+        blade1.position.x = propRadius * 0.48;
+        blade1.rotation.x = 0.28; // Blade pitch angle
+
+        const blade2 = new THREE.Mesh(bladeGeom, MATERIALS.shared.propBlack);
+        blade2.position.x = -propRadius * 0.48;
+        blade2.rotation.x = -0.28;
+
+        // Motion-blur translucent rotor disc (diameter = 4.5 cm)
+        const discGeom = new THREE.RingGeometry(0.38, propRadius, 36);
+        const discMat = new THREE.MeshBasicMaterial({
+          color: 0x94a3b8,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.18
+        });
+        const discMesh = new THREE.Mesh(discGeom, discMat);
+        propGroup.userData.discMat = discMat;
+
+        propGroup.add(blade1, blade2, discMesh);
+        motorUnit.add(propGroup);
+        dynamicMeshes.propellers.push(propGroup);
+
+        // Helical Airflow Streamlines (Estelas de flujo de aire opcionales)
+        const airflowGroup = new THREE.Group();
+        airflowGroup.position.z = -nacelleLength / 2 - 0.5;
+        for (let rIdx = 0; rIdx < 2; rIdx++) {
+          const pts = [];
+          const turns = 2.4;
+          const lengthFlow = 15.5;
+          for (let k = 0; k <= 40; k++) {
+            const t = k / 40;
+            const ang = t * Math.PI * 2 * turns + rIdx * Math.PI;
+            const rad = propRadius * (0.85 - 0.15 * t);
+            pts.push(new THREE.Vector3(Math.cos(ang) * rad, Math.sin(ang) * rad, t * lengthFlow));
+          }
+          const curve = new THREE.CatmullRomCurve3(pts);
+          const tubeGeom = new THREE.TubeGeometry(curve, 36, 0.045, 6, false);
+          const tubeMat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.32
+          });
+          const tubeMesh = new THREE.Mesh(tubeGeom, tubeMat);
+          airflowGroup.add(tubeMesh);
+        }
+        motorUnit.add(airflowGroup);
+        dynamicMeshes.airflowCones.push(airflowGroup);
+
+        aircraftGroup.add(motorUnit);
+      });
+    }
+
+    // ----------------------------------------------------------------------------
+    // 5.4 EMPENNAGE (TAIL): Vertical Fin (43–63 cm, H=11 cm) & Horizontal Stabilizer
+    // ----------------------------------------------------------------------------
+    let hTailGroup;
+
+    function buildEmpennage() {
+      // 1. Vertical Stabilizer (Deriva): Base 43 to 63 cm, height 11 cm, swept LE, flat top
+      const vShape = new THREE.Shape();
+      // Shape in (Z, Y) plane: X_shape = Z_from_nose, Y_shape = height above tail spine
+      vShape.moveTo(43.0, 0.0);
+      vShape.lineTo(53.8, 10.6);
+      vShape.quadraticCurveTo(54.4, 11.0, 55.2, 11.0); // Rounded front-top corner per CAD image 8
+      vShape.lineTo(62.6, 11.0);
+      vShape.quadraticCurveTo(63.0, 11.0, 63.0, 10.5);
+      vShape.lineTo(63.0, -0.4);
+      vShape.lineTo(43.0, 0.0);
+
+      const vThickness = 0.42;
+      const vGeom = new THREE.ExtrudeGeometry(vShape, {
+        steps: 1,
+        depth: vThickness,
+        bevelEnabled: false
+      });
+
+      // Normalize UVs to [0, 1] so our procedural masking-tape texture maps cleanly onto the fin
+      const posAttr = vGeom.attributes.position;
+      const uvAttr = vGeom.attributes.uv;
+      for (let i = 0; i < posAttr.count; i++) {
+        const zVal = posAttr.getX(i);
+        const yVal = posAttr.getY(i);
+        const u = (zVal - 43.0) / 20.0;
+        const v = (yVal + 0.4) / 11.4;
+        uvAttr.setXY(i, u, 1.0 - v);
+      }
+
+      // Rotate so Shape X -> +Z, Shape Y -> +Y, Extrude depth -> centered on X
+      vGeom.rotateY(Math.PI / 2);
+      vGeom.scale(1, 1, -1);
+      // Fix winding after negative scale
+      const idx = vGeom.index;
+      if (idx) {
+        for (let i = 0; i < idx.count; i += 3) {
+          const tmp = idx.getX(i + 1);
+          idx.setX(i + 1, idx.getX(i + 2));
+          idx.setX(i + 2, tmp);
+        }
+      } else {
+        for (let i = 0; i < posAttr.count; i += 3) {
+          for (let k = 0; k < 3; k++) {
+            const tmp = posAttr.array[(i + 1) * 3 + k];
+            posAttr.array[(i + 1) * 3 + k] = posAttr.array[(i + 2) * 3 + k];
+            posAttr.array[(i + 2) * 3 + k] = tmp;
+          }
+        }
+      }
+      vGeom.translate(-vThickness / 2, 2.35, 0);
+      vGeom.computeVertexNormals();
+
+      const vTailMesh = new THREE.Mesh(vGeom, MATERIALS.real.vTail);
+      vTailMesh.castShadow = true;
+      vTailMesh.receiveShadow = true;
+      aircraftGroup.add(vTailMesh);
+      dynamicMeshes.vTail.push(vTailMesh);
+
+      const vEdges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(vGeom, 25),
+        MATERIALS.shared.cadOutline
+      );
+      aircraftGroup.add(vEdges);
+      dynamicMeshes.cadEdges.push(vEdges);
+
+      // 2. Horizontal Stabilizer (Symmetric Trapezoid in Planform, 53 to 62 cm Real vs +2.7 cm CAD)
+      hTailGroup = new THREE.Group();
+      const hSpanHalf = 11.8; // ~23.6 cm total span
+      const rootChord = 9.0;  // 53 to 62 cm = 9.0 cm
+      const tipChord = 6.6;
+
+      const hShape = new THREE.Shape();
+      // Drawn in (X, Z) planform where X is transversal and Y_shape is longitudinal (0 to 9 cm)
+      hShape.moveTo(-hSpanHalf + 1.8, 0);
+      hShape.lineTo(hSpanHalf - 1.8, 0);
+      hShape.quadraticCurveTo(hSpanHalf - 1.3, 0, hSpanHalf - 1.1, 0.5);
+      hShape.lineTo(hSpanHalf, tipChord + 1.8);
+      hShape.quadraticCurveTo(hSpanHalf + 0.1, rootChord, hSpanHalf - 0.6, rootChord);
+      hShape.lineTo(-hSpanHalf + 0.6, rootChord);
+      hShape.quadraticCurveTo(-hSpanHalf - 0.1, rootChord, -hSpanHalf, tipChord + 1.8);
+      hShape.lineTo(-hSpanHalf + 1.1, 0.5);
+      hShape.quadraticCurveTo(-hSpanHalf + 1.3, 0, -hSpanHalf + 1.8, 0);
+
+      const hThickness = 0.36;
+      const hGeom = new THREE.ExtrudeGeometry(hShape, {
+        steps: 1,
+        depth: hThickness,
+        bevelEnabled: false
+      });
+
+      // Normalize UVs for the Kraft cardboard perimeter texture
+      const hPos = hGeom.attributes.position;
+      const hUv = hGeom.attributes.uv;
+      for (let i = 0; i < hPos.count; i++) {
+        const u = (hPos.getX(i) + hSpanHalf) / (hSpanHalf * 2);
+        const v = hPos.getY(i) / rootChord;
+        hUv.setXY(i, u, v);
+      }
+
+      hGeom.rotateX(Math.PI / 2);
+      hGeom.translate(0, 2.25, 0);
+      hGeom.computeVertexNormals();
+
+      const hTailMesh = new THREE.Mesh(hGeom, MATERIALS.real.hTail);
+      hTailMesh.castShadow = true;
+      hTailMesh.receiveShadow = true;
+      hTailGroup.add(hTailMesh);
+      dynamicMeshes.hTail.push(hTailMesh);
+
+      const hEdges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(hGeom, 25),
+        MATERIALS.shared.cadOutline
+      );
+      hTailGroup.add(hEdges);
+      dynamicMeshes.cadEdges.push(hEdges);
+
+      // Default position: Real physical prototype (53.0 to 62.0 cm)
+      hTailGroup.position.z = SPECS.hTailRealStart;
+      aircraftGroup.add(hTailGroup);
+    }
+
+    // ----------------------------------------------------------------------------
+    // 5.5 INTERNAL X-RAY COMPONENTS (14g Lead Ballast 0–1.5 cm & 14g Battery 4–7 cm)
+    // ----------------------------------------------------------------------------
+    function buildInternalComponents() {
+      const internals = new THREE.Group();
+      internals.renderOrder = 0;
+
+      // 1. Lead Ballast 14 g (0.15 to 1.55 cm in nose)
+      const ballastGeom = new THREE.CylinderGeometry(0.95, 1.08, 1.40, 24);
+      ballastGeom.rotateX(Math.PI / 2);
+      const ballastMesh = new THREE.Mesh(ballastGeom, MATERIALS.shared.leadBallast);
+      ballastMesh.position.set(0, -0.35, 0.85);
+      ballastMesh.castShadow = false;
+      ballastMesh.receiveShadow = false;
+      internals.add(ballastMesh);
+
+      // 2. LiPo Battery 14 g (4.0 to 7.0 cm in forward neck)
+      const battGeom = new THREE.BoxGeometry(1.75, 1.35, 3.00);
+      const battMesh = new THREE.Mesh(battGeom, MATERIALS.shared.batteryOrange);
+      battMesh.position.set(0, -0.35, 5.50);
+      battMesh.castShadow = false;
+      battMesh.receiveShadow = false;
+      internals.add(battMesh);
+
+      // Power wiring harness from battery (7 cm) to wing leading edge motors (21.55 cm)
+      const wirePts = [
+        new THREE.Vector3(0, -0.35, 7.0),
+        new THREE.Vector3(0, 0.1, 14.0),
+        new THREE.Vector3(0, 0.65, 21.55)
+      ];
+      const wireCurve = new THREE.CatmullRomCurve3(wirePts);
+      const wireMesh = new THREE.Mesh(
+        new THREE.TubeGeometry(wireCurve, 20, 0.12, 8, false),
+        new THREE.MeshBasicMaterial({ color: 0xef4444 })
+      );
+      wireMesh.castShadow = false;
+      wireMesh.receiveShadow = false;
+      internals.add(wireMesh);
+
+      aircraftGroup.add(internals);
+      dynamicMeshes.internalComponents.push(internals);
+    }
+
+    // ============================================================================
+    // 6. AERODYNAMIC MARKERS, 3D RULER (0–63.5 cm) & ENGINEERING DIMENSIONS
+    // ============================================================================
+    const markersRoot = new THREE.Group();
+    aircraftGroup.add(markersRoot);
+
+    const markerGroups = {
+      le: new THREE.Group(),
+      ca: new THREE.Group(),
+      cg: new THREE.Group(),
+      pn: new THREE.Group(),
+      ruler: new THREE.Group(),
+      dims: new THREE.Group()
+    };
+    Object.values(markerGroups).forEach((g) => markersRoot.add(g));
+
+    const allCss2DLabels = [];
+
+    function makeLabel(htmlText, className, positionVec3, parentGroup) {
+      const div = document.createElement('div');
+      div.className = `label-3d ${className}`;
+      div.innerHTML = htmlText;
+      const obj = new CSS2DObject(div);
+      obj.position.copy(positionVec3);
+      parentGroup.add(obj);
+      allCss2DLabels.push(obj);
+      return obj;
+    }
+
+    function buildAerodynamicMarkers() {
+      // 1. Leading Edge Reference Plane & Line at 21.55 cm
+      const leLinePts = [
+        new THREE.Vector3(-46.5, 0.8, SPECS.wingLE),
+        new THREE.Vector3(46.5, 0.8, SPECS.wingLE)
+      ];
+      const leLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(leLinePts),
+        new THREE.LineBasicMaterial({ color: 0xe2e8f0 })
+      );
+      const leVertPts = [
+        new THREE.Vector3(0, -6.5, SPECS.wingLE),
+        new THREE.Vector3(0, 8.5, SPECS.wingLE)
+      ];
+      const leVert = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(leVertPts),
+        new THREE.LineBasicMaterial({ color: 0x94a3b8 })
+      );
+      markerGroups.le.add(leLine, leVert);
+      makeLabel(
+        '<strong>Borde de Ataque (BA)</strong> · 21,55 cm',
+        'le',
+        new THREE.Vector3(0, -7.2, SPECS.wingLE),
+        markerGroups.le
+      );
+
+      // 2. Aerodynamic Center (CA) at 24.55 cm (25% chord) — Blue 3D Cross
+      const caMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+      const caCross1 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.28, 0.28), caMat);
+      const caCross2 = new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.6, 0.28), caMat);
+      const caCross3 = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 2.6), caMat);
+      const caSymbol = new THREE.Group();
+      caSymbol.position.set(0, 7.8, SPECS.posCA);
+      caSymbol.add(caCross1, caCross2, caCross3);
+
+      const caStem = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, -5.0, SPECS.posCA),
+          new THREE.Vector3(0, 7.8, SPECS.posCA),
+          new THREE.Vector3(-45, 1.2, SPECS.posCA),
+          new THREE.Vector3(45, 1.2, SPECS.posCA)
+        ]),
+        new THREE.LineBasicMaterial({ color: 0x3b82f6 })
+      );
+      markerGroups.ca.add(caSymbol, caStem);
+      makeLabel(
+        '<strong>CA (25 % Cuerda)</strong> · 24,55 cm',
+        'ca',
+        new THREE.Vector3(0, 10.2, SPECS.posCA),
+        markerGroups.ca
+      );
+
+      // 3. Center of Gravity (CG) at 26.40 cm (40% chord) — Red/White Bicolor Sphere
+      const cgGroup = new THREE.Group();
+      cgGroup.position.set(0, 5.5, SPECS.posCG);
+      const rCG = 1.15;
+      const redMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+      // 4 quadrants of sphere
+      for (let q = 0; q < 4; q++) {
+        const g = new THREE.SphereGeometry(rCG, 16, 12, (q * Math.PI) / 2, Math.PI / 2, 0, Math.PI);
+        const m = new THREE.Mesh(g, q % 2 === 0 ? redMat : whiteMat);
+        cgGroup.add(m);
+      }
+
+      const cgStem = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, -5.5, SPECS.posCG),
+          new THREE.Vector3(0, 5.5, SPECS.posCG)
+        ]),
+        new THREE.LineBasicMaterial({ color: 0xef4444 })
+      );
+      markerGroups.cg.add(cgGroup, cgStem);
+      makeLabel(
+        '<strong>CG Diseño (40 %)</strong> · 26,40 cm',
+        'cg',
+        new THREE.Vector3(0, 7.6, SPECS.posCG),
+        markerGroups.cg
+      );
+
+      // 4. Neutral Point (PN) at 27.70 cm (Static Margin 10.7%) — Green Diamond (Octahedron)
+      const pnDiamond = new THREE.Mesh(
+        new THREE.OctahedronGeometry(1.15, 0),
+        new THREE.MeshBasicMaterial({ color: 0x10b981 })
+      );
+      pnDiamond.position.set(0, 3.6, SPECS.posPN);
+      const pnStem = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, -6.0, SPECS.posPN),
+          new THREE.Vector3(0, 3.6, SPECS.posPN)
+        ]),
+        new THREE.LineBasicMaterial({ color: 0x10b981 })
+      );
+      markerGroups.pn.add(pnDiamond, pnStem);
+      makeLabel(
+        '<strong>Punto Neutro (PN)</strong> · 27,70 cm (ME 10,7 %)',
+        'pn',
+        new THREE.Vector3(0, 5.6, SPECS.posPN),
+        markerGroups.pn
+      );
+
+      // Internal component labels (shown when X-Ray or labels active)
+      makeLabel(
+        'Lastre Plomo 14 g (0–1,5 cm)',
+        'comp',
+        new THREE.Vector3(0, 2.5, 0.85),
+        markerGroups.le
+      );
+      makeLabel(
+        'Batería 14 g (4–7 cm)',
+        'comp',
+        new THREE.Vector3(0, 2.5, 5.5),
+        markerGroups.le
+      );
+    }
+
+    function buildGraduatedRulerAndDimensions() {
+      // 1. 3D Graduated Ruler (0 to 63.5 cm parallel to fuselage at X = -49 cm, Y = 0)
+      const rulerX = -49.0;
+      const rulerY = 0.0;
+      const rulerMainPts = [
+        new THREE.Vector3(rulerX, rulerY, 0),
+        new THREE.Vector3(rulerX, rulerY, 64.0)
+      ];
+      const tickPts = [];
+
+      for (let cm = 0; cm <= 64; cm += 1) {
+        const isMajor = cm % 10 === 0;
+        const isMid = cm % 5 === 0;
+        const tickLen = isMajor ? 2.2 : isMid ? 1.4 : 0.65;
+        tickPts.push(
+          new THREE.Vector3(rulerX - tickLen, rulerY, cm),
+          new THREE.Vector3(rulerX + tickLen * 0.4, rulerY, cm)
+        );
+        if (isMajor && cm <= 60) {
+          makeLabel(`${cm} cm`, 'ruler-tick', new THREE.Vector3(rulerX - 3.6, rulerY, cm), markerGroups.ruler);
+        }
+      }
+
+      const rulerLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(rulerMainPts),
+        new THREE.LineBasicMaterial({ color: 0x38bdf8 })
+      );
+      const rulerTicks = new THREE.LineSegments(
+        new THREE.BufferGeometry().setFromPoints(tickPts),
+        new THREE.LineBasicMaterial({ color: 0x94a3b8 })
+      );
+      markerGroups.ruler.add(rulerLine, rulerTicks);
+
+      // 2. Engineering Dimension Callouts (Wingspan 89.497 cm, Fuselage 63.495 / 64.070 cm, Motor spacing 8.2 & 24.6 cm)
+      const dimMat = new THREE.LineBasicMaterial({ color: 0x38bdf8 });
+      const halfSpan = SPECS.wingspan / 2;
+
+      // Wingspan dimension bar behind trailing edge (Z = 37.5 cm)
+      const zSpanDim = 37.5;
+      const spanPts = [
+        new THREE.Vector3(-halfSpan, 0.25, SPECS.wingLE + SPECS.wingChord),
+        new THREE.Vector3(-halfSpan, 0.25, zSpanDim + 1.0),
+        new THREE.Vector3(halfSpan, 0.25, SPECS.wingLE + SPECS.wingChord),
+        new THREE.Vector3(halfSpan, 0.25, zSpanDim + 1.0),
+        new THREE.Vector3(-halfSpan, 0.25, zSpanDim),
+        new THREE.Vector3(halfSpan, 0.25, zSpanDim)
+      ];
+      markerGroups.dims.add(
+        new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(spanPts), dimMat)
+      );
+      makeLabel(
+        'Envergadura: 89,497 cm (Diag: 89,798 cm)',
+        'dim',
+        new THREE.Vector3(0, 0.25, zSpanDim),
+        markerGroups.dims
+      );
+
+      // Motor transversal dimensions ahead of wing (Z = 14.5 cm and Z = 11.2 cm)
+      const xFusEdge = SPECS.fusRadiusAtWing; // 3.88 cm
+      const xInner = xFusEdge + SPECS.motorInnerDist; // 12.08 cm
+      const xOuter = xFusEdge + SPECS.motorOuterDist; // 28.48 cm
+
+      const motorDimPts = [
+        // Inner motor 8.2 cm callout (Right & Left)
+        new THREE.Vector3(xFusEdge, 0.8, 15.2), new THREE.Vector3(xInner, 0.8, 15.2),
+        new THREE.Vector3(xFusEdge, 0.8, 14.6), new THREE.Vector3(xFusEdge, 0.8, 21.0),
+        new THREE.Vector3(xInner, 0.8, 14.6), new THREE.Vector3(xInner, 0.8, 18.0),
+        // Outer motor 24.6 cm callout
+        new THREE.Vector3(xFusEdge, 0.8, 11.5), new THREE.Vector3(xOuter, 0.8, 11.5),
+        new THREE.Vector3(xOuter, 0.8, 10.9), new THREE.Vector3(xOuter, 0.8, 18.0),
+        // Left side symmetry
+        new THREE.Vector3(-xFusEdge, 0.8, 15.2), new THREE.Vector3(-xInner, 0.8, 15.2),
+        new THREE.Vector3(-xFusEdge, 0.8, 11.5), new THREE.Vector3(-xOuter, 0.8, 11.5)
+      ];
+      markerGroups.dims.add(
+        new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(motorDimPts), dimMat)
+      );
+      makeLabel('8,2 cm (M3)', 'dim', new THREE.Vector3((xFusEdge + xInner) / 2, 0.8, 15.2), markerGroups.dims);
+      makeLabel('24,6 cm (M4)', 'dim', new THREE.Vector3((xFusEdge + xOuter) / 2, 0.8, 11.5), markerGroups.dims);
+      makeLabel('8,2 cm (M2)', 'dim', new THREE.Vector3(-(xFusEdge + xInner) / 2, 0.8, 15.2), markerGroups.dims);
+      makeLabel('24,6 cm (M1)', 'dim', new THREE.Vector3(-(xFusEdge + xOuter) / 2, 0.8, 11.5), markerGroups.dims);
+
+      // Fuselage Total Length / Max Diagonal Callout
+      const fusDimPts = [
+        new THREE.Vector3(0, -0.35, 0),
+        new THREE.Vector3(0, 2.35, SPECS.fuselageLength)
+      ];
+      const fusDiagLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(fusDimPts),
+        new THREE.LineDashedMaterial({ color: 0xf59e0b, dashSize: 1.2, gapSize: 0.7 })
+      );
+      fusDiagLine.computeLineDistances();
+      markerGroups.dims.add(fusDiagLine);
+      makeLabel(
+        'Long. Eje: 63,495 cm · Diag. Máx: 64,070 cm',
+        'dim',
+        new THREE.Vector3(0, -5.8, 48.0),
+        markerGroups.dims
+      );
+    }
+
+    // Build all aircraft assemblies
+    buildFuselage();
+    buildMainWing();
+    buildPropulsionSystem();
+    buildEmpennage();
+    buildInternalComponents();
+    buildAerodynamicMarkers();
+    buildGraduatedRulerAndDimensions();
+
+    // ============================================================================
+    // 7. INTERACTIVE UI STATE & MATERIAL / MODE SWITCHING LOGIC
+    // ============================================================================
+    const state = {
+      mode: 'real',          // 'real' | 'cad'
+      xray: false,
+      hTailCadPos: false,    // false = Real (53-62 cm), true = CAD (+2.7 cm aft)
+      targetHTailZ: SPECS.hTailRealStart,
+      rpmPercent: 65,
+      showAirflow: true,
+      pitchDeg: 0,
+      rollDeg: 0,
+      yawDeg: 0,
+      autoStabilityDemo: false
+    };
+
+    function applyVisualState() {
+      const palette = state.mode === 'real' ? MATERIALS.real : MATERIALS.cad;
+
+      dynamicMeshes.fuselage.forEach((m) => {
+        m.material = palette.fuselage;
+        if (state.xray) {
+          m.material.transparent = true;
+          m.material.opacity = 0.24;
+          m.material.depthWrite = false;
+        } else {
+          m.material.transparent = false;
+          m.material.opacity = 1.0;
+          m.material.depthWrite = true;
+        }
+        m.material.needsUpdate = true;
+      });
+
+      dynamicMeshes.wingFront.forEach((m) => {
+        m.material = palette.wingFront;
+        if (state.xray) {
+          m.material.transparent = true;
+          m.material.opacity = 0.25;
+          m.material.depthWrite = false;
+        } else if (state.mode === 'real') {
+          m.material.transparent = true;
+          m.material.opacity = 0.82;
+          m.material.depthWrite = false;
+        } else {
+          m.material.transparent = false;
+          m.material.opacity = 1.0;
+          m.material.depthWrite = true;
+        }
+        m.material.needsUpdate = true;
+      });
+
+      dynamicMeshes.wingRear.forEach((m) => {
+        m.material = palette.wingRear;
+        if (state.xray) {
+          m.material.transparent = true;
+          m.material.opacity = 0.25;
+          m.material.depthWrite = false;
+        } else if (state.mode === 'real') {
+          m.material.transparent = true;
+          m.material.opacity = 0.82;
+          m.material.depthWrite = false;
+        } else {
+          m.material.transparent = false;
+          m.material.opacity = 1.0;
+          m.material.depthWrite = true;
+        }
+        m.material.needsUpdate = true;
+      });
+
+      dynamicMeshes.vTail.forEach((m) => (m.material = palette.vTail));
+      dynamicMeshes.hTail.forEach((m) => (m.material = palette.hTail));
+      dynamicMeshes.nacelles.forEach((m) => (m.material = palette.nacelle));
+
+      // Real-only details (coiled nose wire & central green tape wrap)
+      dynamicMeshes.realOnlyDetails.forEach((obj) => {
+        obj.visible = state.mode === 'real';
+      });
+
+      // CAD crisp edge outlines highlighted in CAD mode
+      MATERIALS.shared.cadOutline.opacity = state.mode === 'cad' ? 0.65 : 0.16;
+
+      // Internal components (14g Lead Ballast, 14g Battery, Balsa Ribs/Spar)
+      dynamicMeshes.internalComponents.forEach((grp) => {
+        grp.visible = state.xray || state.mode === 'real';
+      });
+    }
+
+    applyVisualState();
+
+    // UI Event Listeners
+    const btnModeReal = document.getElementById('btn-mode-real');
+    const btnModeCad = document.getElementById('btn-mode-cad');
+    const btnToggleHTail = document.getElementById('btn-toggle-htail');
+    const htailBadge = document.getElementById('htail-badge');
+    const btnToggleXray = document.getElementById('btn-toggle-xray');
+    const xrayBadge = document.getElementById('xray-badge');
+
+    btnModeReal.addEventListener('click', () => {
+      state.mode = 'real';
+      btnModeReal.classList.add('active');
+      btnModeCad.classList.remove('active-cad');
+      applyVisualState();
+    });
+
+    btnModeCad.addEventListener('click', () => {
+      state.mode = 'cad';
+      btnModeCad.classList.add('active-cad');
+      btnModeReal.classList.remove('active');
+      applyVisualState();
+    });
+
+    btnToggleHTail.addEventListener('click', () => {
+      state.hTailCadPos = !state.hTailCadPos;
+      state.targetHTailZ = state.hTailCadPos
+        ? SPECS.hTailRealStart + SPECS.hTailCadOffset
+        : SPECS.hTailRealStart;
+      htailBadge.textContent = state.hTailCadPos
+        ? 'CAD (+2,7 cm · 55,7–64,7 cm)'
+        : 'REAL (53–62 cm)';
+      btnToggleHTail.classList.toggle('active', state.hTailCadPos);
+    });
+
+    btnToggleXray.addEventListener('click', () => {
+      state.xray = !state.xray;
+      xrayBadge.textContent = state.xray ? 'ON (14g Pb + Bat)' : 'OFF';
+      btnToggleXray.classList.toggle('active', state.xray);
+      applyVisualState();
+    });
+
+    // Checkboxes for Aerodynamic Markers & Rulers
+    const bindCheckbox = (id, groupKey) => {
+      const el = document.getElementById(id);
+      el.addEventListener('change', () => {
+        markerGroups[groupKey].visible = el.checked;
+      });
+    };
+    bindCheckbox('chk-le', 'le');
+    bindCheckbox('chk-ca', 'ca');
+    bindCheckbox('chk-cg', 'cg');
+    bindCheckbox('chk-pn', 'pn');
+    bindCheckbox('chk-ruler', 'ruler');
+    bindCheckbox('chk-dims', 'dims');
+
+    document.getElementById('chk-labels').addEventListener('change', (e) => {
+      labelContainer.style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('btn-toggle-all-aero').addEventListener('click', () => {
+      const ids = ['chk-le', 'chk-ca', 'chk-cg', 'chk-pn'];
+      const anyOff = ids.some((id) => !document.getElementById(id).checked);
+      ids.forEach((id) => {
+        const el = document.getElementById(id);
+        el.checked = anyOff;
+        el.dispatchEvent(new Event('change'));
+      });
+    });
+
+    // Propulsion & Attitude Sliders
+    const sldRpm = document.getElementById('sld-rpm');
+    const valRpm = document.getElementById('val-rpm');
+    sldRpm.addEventListener('input', () => {
+      state.rpmPercent = Number(sldRpm.value);
+      valRpm.textContent = `${state.rpmPercent} %`;
+    });
+
+    const chkAirflow = document.getElementById('chk-airflow');
+    chkAirflow.addEventListener('change', () => {
+      state.showAirflow = chkAirflow.checked;
+    });
+
+    const sldPitch = document.getElementById('sld-pitch');
+    const sldRoll = document.getElementById('sld-roll');
+    const sldYaw = document.getElementById('sld-yaw');
+    const valPitch = document.getElementById('val-pitch');
+    const valRoll = document.getElementById('val-roll');
+    const valYaw = document.getElementById('val-yaw');
+
+    function updateAttitudeFromSliders() {
+      state.pitchDeg = Number(sldPitch.value);
+      state.rollDeg = Number(sldRoll.value);
+      state.yawDeg = Number(sldYaw.value);
+      valPitch.textContent = `${state.pitchDeg.toFixed(1).replace('.', ',')}°`;
+      valRoll.textContent = `${state.rollDeg.toFixed(1).replace('.', ',')}°`;
+      valYaw.textContent = `${state.yawDeg.toFixed(1).replace('.', ',')}°`;
+    }
+
+    [sldPitch, sldRoll, sldYaw].forEach((s) =>
+      s.addEventListener('input', () => {
+        document.getElementById('chk-auto-demo').checked = false;
+        state.autoStabilityDemo = false;
+        updateAttitudeFromSliders();
+      })
+    );
+
+    document.getElementById('btn-reset-attitude').addEventListener('click', () => {
+      document.getElementById('chk-auto-demo').checked = false;
+      state.autoStabilityDemo = false;
+      sldPitch.value = 0;
+      sldRoll.value = 0;
+      sldYaw.value = 0;
+      updateAttitudeFromSliders();
+    });
+
+    document.getElementById('chk-auto-demo').addEventListener('change', (e) => {
+      state.autoStabilityDemo = e.target.checked;
+    });
+
+    // ============================================================================
+    // 8. ORTHOGRAPHIC & ISOMETRIC ENGINEERING CAMERA PRESETS
+    // ============================================================================
+    const camButtons = ['cam-iso', 'cam-top', 'cam-side', 'cam-front'];
+    function setActiveCamBtn(activeId) {
+      camButtons.forEach((id) => {
+        document.getElementById(id).classList.toggle('active', id === activeId);
+      });
+    }
+
+    function switchCameraView(mode) {
+      if (mode === 'iso') {
+        activeCamera = perspectiveCamera;
+        perspectiveCamera.position.set(68, 42, -55);
+        controls.object = activeCamera;
+        controls.target.set(0, 1, 0);
+        controls.enableRotate = true;
+      } else {
+        activeCamera = orthoCamera;
+        controls.object = activeCamera;
+        controls.target.set(0, 0, 5);
+        orthoCamera.zoom = 1.05;
+
+        if (mode === 'top') {
+          // Top Planform View (Vista en Planta como Imagen 2 y 7)
+          orthoCamera.position.set(0, 120, 5);
+          orthoCamera.up.set(0, 0, -1); // Nose pointing UP on screen just like CAD Top view!
+        } else if (mode === 'side') {
+          // Side Profile View (Vista Lateral como Imagen 1 y 6)
+          orthoCamera.position.set(120, 2, 5);
+          orthoCamera.up.set(0, 1, 0);
+        } else if (mode === 'front') {
+          // Front View (Vista Frontal como Imagen 5)
+          orthoCamera.position.set(0, 2, -120);
+          orthoCamera.up.set(0, 1, 0);
+        }
+        orthoCamera.updateProjectionMatrix();
+      }
+      controls.update();
+    }
+
+    document.getElementById('cam-iso').addEventListener('click', () => {
+      setActiveCamBtn('cam-iso');
+      switchCameraView('iso');
+    });
+    document.getElementById('cam-top').addEventListener('click', () => {
+      setActiveCamBtn('cam-top');
+      switchCameraView('top');
+    });
+    document.getElementById('cam-side').addEventListener('click', () => {
+      setActiveCamBtn('cam-side');
+      switchCameraView('side');
+    });
+    document.getElementById('cam-front').addEventListener('click', () => {
+      setActiveCamBtn('cam-front');
+      switchCameraView('front');
+    });
+
+    // ============================================================================
+    // 9. REAL-TIME SIMULATION LOOP (60 FPS)
+    // ============================================================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+      const elapsed = clock.getElapsedTime();
+
+      // 1. Smoothly interpolate Horizontal Stabilizer between Real (53 cm) and CAD (+2.7 cm)
+      if (hTailGroup) {
+        hTailGroup.position.z = THREE.MathUtils.lerp(
+          hTailGroup.position.z,
+          state.targetHTailZ,
+          Math.min(1, dt * 8)
+        );
+      }
+
+      // 2. Spin the 4 Propellers (M1–M4) & animate helical airflow trails
+      const radPerSec = (state.rpmPercent / 100) * 58.0;
+      dynamicMeshes.propellers.forEach((prop) => {
+        prop.rotation.z += radPerSec * dt * prop.userData.spinDir;
+        if (prop.userData.discMat) {
+          prop.userData.discMat.opacity = (state.rpmPercent / 100) * 0.26;
+        }
+      });
+
+      dynamicMeshes.airflowCones.forEach((cone, idx) => {
+        cone.visible = state.showAirflow && state.rpmPercent > 2;
+        if (cone.visible) {
+          const dir = idx % 2 === 0 ? 1 : -1;
+          cone.rotation.z -= radPerSec * 0.45 * dt * dir;
+        }
+      });
+
+      // 3. Attitude Rotation around exact Center of Gravity (26.4 cm from nose)
+      if (state.autoStabilityDemo) {
+        // Damped static stability phugoid/short-period oscillation demo around CG
+        state.pitchDeg = Math.sin(elapsed * 2.1) * 9.5;
+        state.rollDeg = Math.cos(elapsed * 1.6) * 12.0;
+        state.yawDeg = Math.sin(elapsed * 1.1) * 6.5;
+        sldPitch.value = state.pitchDeg;
+        sldRoll.value = state.rollDeg;
+        sldYaw.value = state.yawDeg;
+        valPitch.textContent = `${state.pitchDeg.toFixed(1).replace('.', ',')}°`;
+        valRoll.textContent = `${state.rollDeg.toFixed(1).replace('.', ',')}°`;
+        valYaw.textContent = `${state.yawDeg.toFixed(1).replace('.', ',')}°`;
+      }
+
+      aircraftPivot.rotation.x = THREE.MathUtils.degToRad(state.pitchDeg);
+      aircraftPivot.rotation.z = THREE.MathUtils.degToRad(state.rollDeg);
+      aircraftPivot.rotation.y = THREE.MathUtils.degToRad(state.yawDeg);
+
+      controls.update();
+      renderer.render(scene, activeCamera);
+      labelRenderer.render(scene, activeCamera);
+    }
+
+    animate();
+
+    // Responsive Resize Handler
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const asp = w / h;
+
+      perspectiveCamera.aspect = asp;
+      perspectiveCamera.updateProjectionMatrix();
+
+      orthoCamera.left = -orthoSize * asp;
+      orthoCamera.right = orthoSize * asp;
+      orthoCamera.top = orthoSize;
+      orthoCamera.bottom = -orthoSize;
+      orthoCamera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      renderer.setSize(w, h);
+      labelRenderer.setSize(w, h);
+    });
+  </script>
+</body>
+</html>
