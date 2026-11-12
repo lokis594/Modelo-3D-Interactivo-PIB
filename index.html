@@ -41,6 +41,14 @@
       width: 100%;
       height: 100%;
       z-index: 1;
+      touch-action: none;
+    }
+
+    #canvas-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
     }
 
     #label-container {
@@ -190,6 +198,13 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .mobile-only-btn {
+      display: none;
     }
 
     .sidebar-scroll::-webkit-scrollbar {
@@ -456,17 +471,158 @@
       border: 1px solid rgba(255,255,255,0.25);
     }
 
-    @media (max-width: 960px) {
-      .hud-header {
-        right: 16px;
-        flex-direction: column;
-        align-items: flex-start;
+    @media (max-width: 768px) {
+      .mobile-only-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        appearance: none;
+        background: rgba(30, 41, 59, 0.88);
+        border: 1px solid rgba(56, 189, 248, 0.42);
+        color: var(--accent-cyan);
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        font-weight: 600;
+        padding: 5px 9px;
+        border-radius: 7px;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
+
+      .mobile-only-btn.active {
+        background: rgba(56, 189, 248, 0.22);
+        color: #ffffff;
+      }
+
+      .hud-header {
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+      }
+
+      .header-top-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        width: 100%;
+      }
+
+      .brand-block {
+        gap: 8px;
+        min-width: 0;
+        flex: 1;
+      }
+
+      .brand-badge {
+        font-size: 9px;
+        padding: 3px 6px;
+        flex-shrink: 0;
+      }
+
+      .brand-title {
+        min-width: 0;
+      }
+
+      .brand-title h1 {
+        font-size: 12px;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .brand-title p {
+        font-size: 9.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .telemetry-pills {
+        display: none;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        width: 100%;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(148, 163, 184, 0.18);
+      }
+
+      .hud-header.show-specs .telemetry-pills {
+        display: grid;
+      }
+
+      .telemetry-pill {
+        min-width: 0;
+        padding: 4px 8px;
+      }
+
+      .telemetry-pill span.lbl {
+        font-size: 8.5px;
+      }
+
+      .telemetry-pill span.val {
+        font-size: 11px;
+      }
+
+      /* Bottom Sheet Drawer on Mobile (max 42vh, collapsible to 44px tab) */
       .hud-sidebar {
         top: auto;
-        height: 52vh;
-        width: calc(100% - 28px);
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: auto;
+        max-height: 42vh;
+        border-radius: 16px 16px 0 0;
+        border-bottom: none;
+        transition: max-height 0.28s cubic-bezier(0.22, 1, 0.36, 1);
       }
+
+      .hud-sidebar.collapsed {
+        max-height: 44px;
+      }
+
+      .sidebar-header {
+        height: 44px;
+        min-height: 44px;
+        padding: 0 12px;
+        cursor: pointer;
+      }
+
+      .sidebar-header h2 {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+      }
+
+      .desktop-scale-tag {
+        display: none;
+      }
+
+      .sidebar-scroll {
+        padding: 10px 12px 16px 12px;
+        gap: 10px;
+      }
+
+      /* Compact 3D Floating Labels on Mobile Portrait */
+      .label-3d {
+        font-size: 9px;
+        padding: 2px 5px;
+        border-radius: 4px;
+      }
+
+      .label-3d.ruler-tick {
+        font-size: 8px;
+      }
+
       .hud-footer {
         display: none;
       }
@@ -489,13 +645,18 @@
   <div id="label-container"></div>
 
   <!-- Top Telemetry Bar -->
-  <header class="hud-header">
-    <div class="brand-block">
-      <div class="brand-badge">CAD · ESCALA 1:1 CM</div>
-      <div class="brand-title">
-        <h1>PROTOTIPO RC / REDBULL TE DA ALAS</h1>
-        <p>Gemelo Digital Aeroespacial · Perfil Clark Y · Margen Estático +10,7 %</p>
+  <header id="hud-header" class="hud-header">
+    <div class="header-top-row" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div class="brand-block">
+        <div class="brand-badge">CAD · ESCALA 1:1 CM</div>
+        <div class="brand-title">
+          <h1>PROTOTIPO RC / REDBULL TE DA ALAS</h1>
+          <p>Gemelo Digital Aeroespacial · Perfil Clark Y · Margen Estático +10,7 %</p>
+        </div>
       </div>
+      <button id="btn-toggle-specs" class="mobile-only-btn" type="button" aria-label="Mostrar u ocultar ficha técnica">
+        ℹ️ Ficha Técnica
+      </button>
     </div>
     <div class="telemetry-pills">
       <div class="telemetry-pill">
@@ -517,11 +678,14 @@
     </div>
   </header>
 
-  <!-- Right Control Sidebar -->
-  <aside class="hud-sidebar">
-    <div class="sidebar-header">
+  <!-- Right Control Sidebar (Desktop) / Bottom Drawer (Mobile) -->
+  <aside id="hud-sidebar" class="hud-sidebar">
+    <div id="sidebar-header-bar" class="sidebar-header">
       <h2><span class="status-dot"></span> PANEL DE CONTROL DE INGENIERÍA</h2>
-      <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">1 u = 1 cm</span>
+      <span class="desktop-scale-tag" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">1 u = 1 cm</span>
+      <button id="btn-toggle-drawer" class="mobile-only-btn" type="button" aria-label="Minimizar o expandir panel de controles">
+        ⚙️ Controles ▼
+      </button>
     </div>
 
     <div class="sidebar-scroll">
@@ -764,7 +928,6 @@
       0.5,
       1000
     );
-    perspectiveCamera.position.set(68, 42, -55);
 
     const orthoSize = 58;
     const aspect = window.innerWidth / window.innerHeight;
@@ -776,6 +939,41 @@
       -500,
       1000
     );
+
+    // Responsive camera calibration for Portrait (vertical mobile) vs Landscape (desktop)
+    function applyResponsiveCameraFraming(resetPosition = false) {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const asp = w / h;
+      const isPortrait = w < h;
+
+      // Adjust FOV and initial distance on narrow portrait screens so the 89.497 cm wingspan never clips
+      perspectiveCamera.fov = isPortrait ? 52 : 40;
+      perspectiveCamera.aspect = asp;
+      perspectiveCamera.updateProjectionMatrix();
+
+      if (resetPosition) {
+        const distScale = isPortrait ? Math.min(1.75, Math.max(1.28, 0.78 / asp)) : 1.0;
+        perspectiveCamera.position.set(68 * distScale, 42 * distScale, -55 * distScale);
+      }
+
+      // Keep full 89.497 cm wingspan & ruler inside orthographic frustum on portrait screens
+      if (isPortrait) {
+        const halfWidth = 54;
+        orthoCamera.left = -halfWidth;
+        orthoCamera.right = halfWidth;
+        orthoCamera.top = halfWidth / asp;
+        orthoCamera.bottom = -halfWidth / asp;
+      } else {
+        orthoCamera.left = -orthoSize * asp;
+        orthoCamera.right = orthoSize * asp;
+        orthoCamera.top = orthoSize;
+        orthoCamera.bottom = -orthoSize;
+      }
+      orthoCamera.updateProjectionMatrix();
+    }
+
+    applyResponsiveCameraFraming(true);
 
     let activeCamera = perspectiveCamera;
 
@@ -795,6 +993,13 @@
     const controls = new OrbitControls(activeCamera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
+    controls.enableRotate = true;
+    controls.enableZoom = true;
+    controls.enablePan = true;
+    controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN
+    };
     controls.target.set(0, 1, 0); // Centered on CG
 
     // Lighting Studio
@@ -2287,12 +2492,13 @@
     function switchCameraView(mode) {
       if (mode === 'iso') {
         activeCamera = perspectiveCamera;
-        perspectiveCamera.position.set(68, 42, -55);
+        applyResponsiveCameraFraming(true);
         controls.object = activeCamera;
         controls.target.set(0, 1, 0);
         controls.enableRotate = true;
       } else {
         activeCamera = orthoCamera;
+        applyResponsiveCameraFraming(false);
         controls.object = activeCamera;
         controls.target.set(0, 0, 5);
         orthoCamera.zoom = 1.05;
@@ -2330,6 +2536,33 @@
     document.getElementById('cam-front').addEventListener('click', () => {
       setActiveCamBtn('cam-front');
       switchCameraView('front');
+    });
+
+    // Mobile UI Controls: Collapsible Top Technical Specs & Bottom Drawer Sheet
+    const hudHeaderEl = document.getElementById('hud-header');
+    const btnToggleSpecs = document.getElementById('btn-toggle-specs');
+    const hudSidebarEl = document.getElementById('hud-sidebar');
+    const btnToggleDrawer = document.getElementById('btn-toggle-drawer');
+    const sidebarHeaderBar = document.getElementById('sidebar-header-bar');
+
+    btnToggleSpecs.addEventListener('click', () => {
+      const shown = hudHeaderEl.classList.toggle('show-specs');
+      btnToggleSpecs.classList.toggle('active', shown);
+      btnToggleSpecs.textContent = shown ? '✕ Cerrar Ficha' : 'ℹ️ Ficha Técnica';
+    });
+
+    function toggleMobileDrawer(e) {
+      if (window.innerWidth > 768) return;
+      if (e) e.stopPropagation();
+      const isCollapsed = hudSidebarEl.classList.toggle('collapsed');
+      btnToggleDrawer.classList.toggle('active', !isCollapsed);
+      btnToggleDrawer.textContent = isCollapsed ? '⚙️ Controles ▲' : '⚙️ Controles ▼';
+    }
+
+    btnToggleDrawer.addEventListener('click', toggleMobileDrawer);
+    sidebarHeaderBar.addEventListener('click', (e) => {
+      if (e.target === btnToggleDrawer) return;
+      toggleMobileDrawer(e);
     });
 
     // ============================================================================
@@ -2393,20 +2626,16 @@
 
     animate();
 
-    // Responsive Resize Handler
+    // Responsive Resize Handler (Portrait vs Landscape detection)
+    let wasPortrait = window.innerWidth < window.innerHeight;
     window.addEventListener('resize', () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      const asp = w / h;
+      const isNowPortrait = w < h;
+      const orientationChanged = isNowPortrait !== wasPortrait;
+      wasPortrait = isNowPortrait;
 
-      perspectiveCamera.aspect = asp;
-      perspectiveCamera.updateProjectionMatrix();
-
-      orthoCamera.left = -orthoSize * asp;
-      orthoCamera.right = orthoSize * asp;
-      orthoCamera.top = orthoSize;
-      orthoCamera.bottom = -orthoSize;
-      orthoCamera.updateProjectionMatrix();
+      applyResponsiveCameraFraming(orientationChanged);
 
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       renderer.setSize(w, h);
